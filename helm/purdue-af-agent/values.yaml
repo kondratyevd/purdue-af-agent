@@ -1,0 +1,25 @@
+replicaCount: 1
+
+image:
+  repository: python
+  pullPolicy: IfNotPresent
+  tag: "3.11-slim"
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+config:
+  openai:
+    baseUrl: "https://genai.rcac.purdue.edu/api"
+    model: "gpt-oss:120b"
+    secretName: "a2rchi-openai-api-key"
+    secretKey: "OPENAI_API_KEY"

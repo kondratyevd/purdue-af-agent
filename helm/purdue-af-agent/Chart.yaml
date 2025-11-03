@@ -1,0 +1,6 @@
+apiVersion: v2
+name: purdue-af-agent
+description: Purdue AF Agent - LangChain agent for Slurm job debugging
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

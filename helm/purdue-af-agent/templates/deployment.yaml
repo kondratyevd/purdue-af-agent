@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "purdue-af-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "purdue-af-agent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "purdue-af-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "purdue-af-agent.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: install-dependencies
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              mkdir -p /app /shared-packages
+              cp /config/requirements.txt /app/
+              cp /config/__init__.py /app/
+              cp /config/config.py /app/
+              cp /config/agent.py /app/
+              cp /config/main.py /app/
+              pip install --no-cache-dir -r /app/requirements.txt --target /shared-packages --break-system-packages
+              echo "✅ All setup complete"
+          volumeMounts:
+            - name: app-code
+              mountPath: /config
+            - name: app-storage
+              mountPath: /app
+            - name: shared-packages
+              mountPath: /shared-packages
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: 8001
+          command:
+            - /bin/bash
+            - -c
+            - |
+              export PYTHONPATH="/shared-packages:$PYTHONPATH"
+              export PATH="/shared-packages:$PATH"
+              cd /app && python -m uvicorn main:app --host 0.0.0.0 --port 8001
+          env:
+            - name: OPENAI_BASE_URL
+              value: {{ .Values.config.openai.baseUrl | quote }}
+            - name: OPENAI_MODEL
+              value: {{ .Values.config.openai.model | quote }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.openai.secretName }}
+                  key: {{ .Values.config.openai.secretKey }}
+            - name: PYTHONPATH
+              value: /shared-packages
+          volumeMounts:
+            - name: app-storage
+              mountPath: /app
+            - name: shared-packages
+              mountPath: /shared-packages
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: app-code
+          configMap:
+            name: {{ include "purdue-af-agent.fullname" . }}-config
+        - name: app-storage
+          emptyDir: {}
+        - name: shared-packages
+          emptyDir: {}

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "purdue-af-agent.fullname" . }}-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "purdue-af-agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "purdue-af-agent.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,22 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv
+
+# Environment variables
+.env
+
+# Generated diagram files
+*.png
+!helm/**/*.png
+
