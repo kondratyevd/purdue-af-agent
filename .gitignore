@@ -16,7 +16,3 @@ ENV/
 # Environment variables
 .env
 
-# Generated diagram files
-*.png
-!helm/**/*.png
-

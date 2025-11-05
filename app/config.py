@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-oss:120b")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     timezone: str = os.getenv("TIMEZONE", "US/Eastern")  # Timezone for datetime operations
+    max_tool_iterations: int = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
     
     class Config:
         env_file = ".env"
