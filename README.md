@@ -7,12 +7,12 @@ LangChain agent with LangGraph for profiling query processing, time extraction, 
 ![Agent Graph](agent_diagram.png)
 
 The agent uses a multi-stage workflow:
-1. **System Prompt**: Initializes global system instructions
-2. **Classify Query**: Determines if the query is about profiling
-3. **Generate Plan**: Creates a step-by-step plan using available tools
-4. **Analyze Plan**: Validates that all required tools are available
-5. **Agent Loop**: Executes tools and extracts metadata iteratively
-6. **Finalize**: Generates final summary and status
+1. **Classify Query**: Determines if the query is about profiling
+2. **Agent Loop**: Analyzes query, calls tools, and reflects on results
+   - **Agent**: Decides on actions (tool calls or final answer)
+   - **Tools**: Executes tool calls
+   - **Think**: Automatically reflects on tool results
+3. **Finalize**: Generates final summary with extracted metadata
 
 ## Project Structure
 
@@ -25,6 +25,7 @@ The agent uses a multi-stage workflow:
 │   ├── prompts.py          # All agent prompts
 │   ├── schemas.py          # Pydantic models for state and structured outputs
 │   ├── tools.py            # LangChain tools for time operations
+│   ├── utils.py            # Utility functions for tool call validation
 │   └── requirements.txt    # Python dependencies
 ├── helm/                   # Kubernetes Helm charts
 │   └── purdue-af-agent/
@@ -34,7 +35,6 @@ The agent uses a multi-stage workflow:
 ├── test.py                # Test client
 ├── test_utils.py          # Test output formatting utilities
 └── agent_diagram.png      # Agent graph visualization
-
 ```
 
 ## Local Testing

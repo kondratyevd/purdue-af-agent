@@ -101,7 +101,6 @@ def format_agent_output(output):
     summary_table.add_column("Field", style="cyan", no_wrap=True)
     summary_table.add_column("Value", style="white")
 
-    summary_table.add_row("Status", output.get('status', 'N/A'))
     summary_table.add_row("Username", output.get('username', 'N/A') or 'None')
     summary_table.add_row("Start Time", output.get('start_time', 'N/A') or 'None')
     summary_table.add_row("End Time", output.get('end_time', 'N/A') or 'None')

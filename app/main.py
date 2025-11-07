@@ -16,14 +16,15 @@ async def health():
 @app.post("/api/query")
 async def query(query: str = Body(..., embed=True)) -> AgentOutputState:
     from langchain_core.messages import HumanMessage
-    
+
     initial_state = {
         "messages": [HumanMessage(content=query)],
-        "tool_iteration_count": 0
+        "tool_iteration_count": 0,
     }
-    
-    # Account for: system_prompt, classify, plan_tools, analyze_plan, agent loop (max_tool_iterations), tools loop, finalize
-    recursion_limit = (settings.max_tool_iterations * 3) + 20
+
+    # Account for: classify, agent loop (max_tool_iterations), tools, think, finalize
+    # Each iteration: agent -> tools -> think -> agent (3 nodes per iteration)
+    recursion_limit = (settings.max_tool_iterations * 3) + 10
     response = agent.invoke(initial_state, config={"recursion_limit": recursion_limit})
-    
+
     return AgentOutputState(**response)
