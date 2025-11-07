@@ -2,17 +2,24 @@
 """Test utilities for formatting agent output."""
 
 import json
+import sys
+import os
+from typing import Optional, Dict, Any, List
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
+
+# Add app directory to path to import utils
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
+from streaming import serialize_message, parse_sse_line
 
 console = Console()
 
 
 def messages_to_dict(messages):
     """Convert LangChain messages to dict format for serialization."""
-    return [msg.model_dump() if hasattr(msg, 'model_dump') else msg.dict() if hasattr(msg, 'dict') else str(msg) for msg in messages]
+    return [serialize_message(msg) for msg in messages]
 
 
 def format_message_content(message_dict):
@@ -79,22 +86,28 @@ def format_messages(messages):
         console.print()  # Add spacing between messages
 
 
-def format_agent_output(output):
-    """Format the full agent output; print conversation history first."""
-    # Display conversation history first
-    messages = output.get('messages', [])
-    if messages:
-        console.print(Panel(
-            f"Conversation History ({len(messages)} messages)",
-            title="💬 Conversation History",
-            border_style="bold blue"
-        ))
+def format_agent_output(output, skip_conversation_history=False):
+    """Format the full agent output.
+    
+    Args:
+        output: Agent output dictionary
+        skip_conversation_history: If True, skip printing conversation history
+                                  (useful for streaming mode where messages are already displayed)
+    """
+    # Display conversation history first (unless skipped)
+    if not skip_conversation_history:
+        messages = output.get('messages', [])
+        if messages:
+            console.print(Panel(
+                f"Conversation History ({len(messages)} messages)",
+                title="💬 Conversation History",
+                border_style="bold blue"
+            ))
+            console.print()
+            format_messages(messages)
+        else:
+            console.print("[dim]No conversation history available[/dim]")
         console.print()
-        format_messages(messages)
-    else:
-        console.print("[dim]No conversation history available[/dim]")
-
-    console.print()
 
     # Then display summary and metadata
     summary_table = Table(title="Agent Output Summary", show_header=True, header_style="bold magenta")
@@ -123,4 +136,102 @@ def format_agent_output(output):
 def format_message(message):
     """Alias for format_message_dict for backward compatibility."""
     return format_message_dict(message)
+
+
+def _is_new_message(msg_id: str, accumulated_messages: List[dict]) -> bool:
+    """Check if a message ID is new (not in accumulated messages)."""
+    existing_ids = [m.get("id") if isinstance(m, dict) else str(m) for m in accumulated_messages]
+    return msg_id not in existing_ids
+
+
+def process_sse_stream(response) -> Dict[str, Any]:
+    """Process SSE stream and return accumulated messages and final output."""
+    accumulated_messages = []
+    final_output = None
+    buffer = ""
+    
+    for line in response.iter_lines(decode_unicode=True):
+        if line:
+            buffer += line + "\n"
+        elif buffer:  # Empty line indicates end of SSE event
+            for sse_line in buffer.strip().split("\n"):
+                data = parse_sse_line(sse_line)
+                if not data:
+                    continue
+                
+                chunk_type = data.get("type")
+                content = data.get("content")
+                
+                if chunk_type == "message_chain" and isinstance(content, dict):
+                    console.print()
+                    format_message_dict(content)
+                    accumulated_messages.append(content)
+                
+                elif chunk_type == "message" and isinstance(content, dict):
+                    msg_id = content.get("id") or str(content)
+                    if _is_new_message(msg_id, accumulated_messages):
+                        accumulated_messages.append(content)
+                        if content.get("type") and ("content" in content or "text" in content):
+                            console.print()
+                            format_message_dict(content)
+                
+                elif chunk_type == "final":
+                    final_output = content
+            
+            buffer = ""
+    
+    return final_output or {
+        "messages": accumulated_messages,
+        "agent_summary": "",
+        "username": None,
+        "start_time": None,
+        "end_time": None,
+    }
+
+
+def generate_diagram():
+    """Generate and save a mermaid diagram of the agent graph."""
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
+    from agent import create_agent_executor
+    
+    agent = create_agent_executor()
+    graph_img = agent.get_graph().draw_mermaid_png()
+    
+    output_path = "agent_diagram.png"
+    with open(output_path, "wb") as f:
+        f.write(graph_img)
+    print(f"📊 Agent diagram saved to {output_path}")
+
+
+def display_user_query(query: str):
+    """Display the user query as a human message."""
+    human_message = {"type": "human", "content": query}
+    console.print()
+    format_message_dict(human_message)
+
+
+def run_test_script(script_name: str, test_agent_func):
+    """Common main execution block for test scripts.
+    
+    Args:
+        script_name: Name of the script (e.g., 'test_streaming.py')
+        test_agent_func: Function that takes a query string and returns the result
+    """
+    import sys
+    
+    if len(sys.argv) < 2:
+        print(f"Usage: python {script_name} <query>")
+        print("\nGenerating agent diagram...")
+        generate_diagram()
+        sys.exit(0)
+    
+    print("Generating agent diagram...")
+    generate_diagram()
+    print()
+    
+    query = sys.argv[1]
+    result = test_agent_func(query)
+    format_agent_output(result)
 

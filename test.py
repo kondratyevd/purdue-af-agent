@@ -1,56 +1,65 @@
 #!/usr/bin/env python3
-"""Minimal test script for the agent."""
+"""Test script for the agent with optional streaming mode."""
 
+import argparse
 import requests
 import sys
-import os
-
-# Add app directory to path to import agent
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
-
-from agent import create_agent_executor
-from test_utils import format_agent_output
+from test_utils import format_agent_output, process_sse_stream, display_user_query, generate_diagram
 
 API_URL = "http://localhost:8000"
 
 
-def generate_diagram():
-    """Generate and save a mermaid diagram of the agent graph."""
-    agent = create_agent_executor()
-    graph_img = agent.get_graph().draw_mermaid_png()
+def test_agent(query: str, stream: bool = False):
+    """Test the agent with a query.
     
-    output_path = "agent_diagram.png"
-    with open(output_path, "wb") as f:
-        f.write(graph_img)
-    print(f"📊 Agent diagram saved to {output_path}")
-
-
-def test_agent(query: str):
-    """Test the agent with a query."""
-    response = requests.post(
-        f"{API_URL}/api/query",
-        json={"query": query},
-        timeout=300,  # 5 minute timeout
-    )
-    response.raise_for_status()
-    return response.json()
+    Args:
+        query: The query string
+        stream: Whether to use streaming mode (default: False)
+    """
+    display_user_query(query)
+    
+    if stream:
+        response = requests.post(
+            f"{API_URL}/api/query",
+            json={"query": query},
+            params={"stream": True},
+            stream=True,
+            timeout=300,
+        )
+        response.raise_for_status()
+        return process_sse_stream(response)
+    else:
+        response = requests.post(
+            f"{API_URL}/api/query",
+            json={"query": query},
+            params={"stream": False},
+            timeout=300,
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python test.py <query>")
+    parser = argparse.ArgumentParser(description="Test the agent with a query")
+    parser.add_argument("query", nargs="?", help="The query to test")
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Enable streaming mode (default: synchronous mode)"
+    )
+    
+    args = parser.parse_args()
+    
+    if not args.query:
+        print("Usage: python test.py <query> [--stream]")
         print("\nGenerating agent diagram...")
         generate_diagram()
         sys.exit(0)
     
-    # Generate diagram first
     print("Generating agent diagram...")
     generate_diagram()
     print()
     
-    query = sys.argv[1]
-    result = test_agent(query)
-    
-    # Format and display the agent output with conversation history
-    format_agent_output(result)
+    result = test_agent(args.query, stream=args.stream)
+    format_agent_output(result, skip_conversation_history=args.stream)
 
